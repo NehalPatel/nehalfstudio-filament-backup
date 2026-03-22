@@ -1,0 +1,27 @@
+# Dependencies
+/vendor
+
+# Lock file (library: consumers resolve versions; CI runs composer update)
+/composer.lock
+
+# PHPUnit
+.phpunit.result.cache
+.phpunit.cache
+
+# IDE & OS
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Local env / secrets (never commit credentials)
+.env
+.env.*
+!.env.example
+
+# Logs & temp
+*.log
+/tmp

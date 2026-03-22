@@ -63,7 +63,16 @@ class ManageBackups extends Page
     }
 
     /**
-     * @return array<int, array{title: string, rows: array<string, string>}>
+     * @param  'default'|'yes'|'no'|'path'|'code'|'scroll'|'muted'|'success'|'danger'  $present
+     * @return array{label: string, value: string, present: string}
+     */
+    protected function configItem(string $label, string $value, string $present = 'default'): array
+    {
+        return ['label' => $label, 'value' => $value, 'present' => $present];
+    }
+
+    /**
+     * @return array<int, array{title: string, accent: string, rows: array<int, array{label: string, value: string, present: string}>}>
      */
     public function getConfigSectionsProperty(): array
     {
@@ -80,10 +89,15 @@ class ManageBackups extends Page
 
         $credPath = config('filament-backup.google_drive.credentials_json');
         $credDisplay = __('filament-backup::page.not_configured');
+        $credPresent = 'muted';
         if (is_string($credPath) && trim($credPath) !== '') {
-            $credDisplay = is_file($credPath)
-                ? __('filament-backup::page.credentials_file_ok', ['file' => basename($credPath)])
-                : __('filament-backup::page.credentials_file_missing', ['file' => basename($credPath)]);
+            if (is_file($credPath)) {
+                $credDisplay = __('filament-backup::page.credentials_file_ok', ['file' => basename($credPath)]);
+                $credPresent = 'success';
+            } else {
+                $credDisplay = __('filament-backup::page.credentials_file_missing', ['file' => basename($credPath)]);
+                $credPresent = 'danger';
+            }
         }
 
         $excludes = config('filament-backup.storage.exclude', []);
@@ -93,60 +107,123 @@ class ManageBackups extends Page
             ? __('filament-backup::page.bool_yes')
             : __('filament-backup::page.bool_no');
 
+        $boolPresent = fn (bool $v): string => $v ? 'yes' : 'no';
+
         $folderId = config('filament-backup.google_drive.folder_id');
         $folderDisplay = (is_string($folderId) && trim($folderId) !== '')
             ? $folderId
             : __('filament-backup::page.not_configured');
+        $folderPresent = (is_string($folderId) && trim($folderId) !== '') ? 'code' : 'muted';
+
+        $dateFolderLine = 'YYYYMMDD / '.app(LocalDestination::class)->dateFolderName();
 
         return [
             [
                 'title' => __('filament-backup::page.section_general'),
+                'accent' => 'slate',
                 'rows' => [
-                    __('filament-backup::page.label_retention') => (string) (int) config('filament-backup.retention_count', 3),
-                    __('filament-backup::page.label_require_gate') => $bool((bool) config('filament-backup.require_gate', false)),
+                    $this->configItem(
+                        __('filament-backup::page.label_retention'),
+                        (string) (int) config('filament-backup.retention_count', 3),
+                        'default'
+                    ),
+                    $this->configItem(
+                        __('filament-backup::page.label_require_gate'),
+                        $bool((bool) config('filament-backup.require_gate', false)),
+                        $boolPresent((bool) config('filament-backup.require_gate', false))
+                    ),
                 ],
             ],
             [
                 'title' => __('filament-backup::page.section_database'),
+                'accent' => 'primary',
                 'rows' => [
-                    __('filament-backup::page.label_db_connection') => $dbConnectionLabel,
-                    __('filament-backup::page.label_db_gzip') => $bool((bool) config('filament-backup.database.gzip', true)),
-                    __('filament-backup::page.label_mysqldump_path') => (string) config('filament-backup.database.mysqldump_path', 'mysqldump'),
-                    __('filament-backup::page.label_db_timeout') => (string) (int) config('filament-backup.database.timeout_seconds', 3600),
+                    $this->configItem(__('filament-backup::page.label_db_connection'), $dbConnectionLabel, 'default'),
+                    $this->configItem(
+                        __('filament-backup::page.label_db_gzip'),
+                        $bool((bool) config('filament-backup.database.gzip', true)),
+                        $boolPresent((bool) config('filament-backup.database.gzip', true))
+                    ),
+                    $this->configItem(
+                        __('filament-backup::page.label_mysqldump_path'),
+                        (string) config('filament-backup.database.mysqldump_path', 'mysqldump'),
+                        'path'
+                    ),
+                    $this->configItem(
+                        __('filament-backup::page.label_db_timeout'),
+                        (string) (int) config('filament-backup.database.timeout_seconds', 3600),
+                        'default'
+                    ),
                 ],
             ],
             [
                 'title' => __('filament-backup::page.section_storage'),
+                'accent' => 'sky',
                 'rows' => [
-                    __('filament-backup::page.label_storage_root') => $storageRootDisplay,
-                    __('filament-backup::page.label_storage_excludes') => $excludeList !== '' ? $excludeList : __('filament-backup::page.not_set'),
+                    $this->configItem(__('filament-backup::page.label_storage_root'), $storageRootDisplay, 'path'),
+                    $this->configItem(
+                        __('filament-backup::page.label_storage_excludes'),
+                        $excludeList !== '' ? $excludeList : __('filament-backup::page.not_set'),
+                        $excludeList !== '' ? 'scroll' : 'muted'
+                    ),
                 ],
             ],
             [
                 'title' => __('filament-backup::page.section_local'),
+                'accent' => 'emerald',
                 'rows' => [
-                    __('filament-backup::page.label_local_enabled') => $bool((bool) config('filament-backup.local.enabled', true)),
-                    __('filament-backup::page.label_local_path') => $localPath,
-                    __('filament-backup::page.label_backup_date_folders') => 'YYYYMMDD / '.app(LocalDestination::class)->dateFolderName(),
+                    $this->configItem(
+                        __('filament-backup::page.label_local_enabled'),
+                        $bool((bool) config('filament-backup.local.enabled', true)),
+                        $boolPresent((bool) config('filament-backup.local.enabled', true))
+                    ),
+                    $this->configItem(__('filament-backup::page.label_local_path'), $localPath, 'path'),
+                    $this->configItem(__('filament-backup::page.label_backup_date_folders'), $dateFolderLine, 'code'),
                 ],
             ],
             [
                 'title' => __('filament-backup::page.section_google_drive'),
+                'accent' => 'amber',
                 'rows' => [
-                    __('filament-backup::page.label_gdrive_enabled') => $bool((bool) config('filament-backup.google_drive.enabled', false)),
-                    __('filament-backup::page.label_gdrive_credentials') => $credDisplay,
-                    __('filament-backup::page.label_gdrive_folder') => $folderDisplay,
-                    __('filament-backup::page.label_backup_date_folders') => 'YYYYMMDD / '.app(LocalDestination::class)->dateFolderName(),
+                    $this->configItem(
+                        __('filament-backup::page.label_gdrive_enabled'),
+                        $bool((bool) config('filament-backup.google_drive.enabled', false)),
+                        $boolPresent((bool) config('filament-backup.google_drive.enabled', false))
+                    ),
+                    $this->configItem(__('filament-backup::page.label_gdrive_credentials'), $credDisplay, $credPresent),
+                    $this->configItem(__('filament-backup::page.label_gdrive_folder'), $folderDisplay, $folderPresent),
+                    $this->configItem(__('filament-backup::page.label_backup_date_folders'), $dateFolderLine, 'code'),
                 ],
             ],
             [
                 'title' => __('filament-backup::page.section_schedule'),
+                'accent' => 'violet',
                 'rows' => [
-                    __('filament-backup::page.label_schedule_enabled') => $bool((bool) config('filament-backup.schedule.enabled', false)),
-                    __('filament-backup::page.label_schedule_cron') => (string) config('filament-backup.schedule.expression', '0 2 * * *'),
-                    __('filament-backup::page.label_schedule_type') => (string) config('filament-backup.schedule.type', 'both'),
-                    __('filament-backup::page.label_schedule_without_overlapping') => $bool((bool) config('filament-backup.schedule.without_overlapping', true)),
-                    __('filament-backup::page.label_schedule_overlap_minutes') => (string) (int) config('filament-backup.schedule.overlap_minutes', 120),
+                    $this->configItem(
+                        __('filament-backup::page.label_schedule_enabled'),
+                        $bool((bool) config('filament-backup.schedule.enabled', false)),
+                        $boolPresent((bool) config('filament-backup.schedule.enabled', false))
+                    ),
+                    $this->configItem(
+                        __('filament-backup::page.label_schedule_cron'),
+                        (string) config('filament-backup.schedule.expression', '0 2 * * *'),
+                        'code'
+                    ),
+                    $this->configItem(
+                        __('filament-backup::page.label_schedule_type'),
+                        (string) config('filament-backup.schedule.type', 'both'),
+                        'default'
+                    ),
+                    $this->configItem(
+                        __('filament-backup::page.label_schedule_without_overlapping'),
+                        $bool((bool) config('filament-backup.schedule.without_overlapping', true)),
+                        $boolPresent((bool) config('filament-backup.schedule.without_overlapping', true))
+                    ),
+                    $this->configItem(
+                        __('filament-backup::page.label_schedule_overlap_minutes'),
+                        (string) (int) config('filament-backup.schedule.overlap_minutes', 120),
+                        'default'
+                    ),
                 ],
             ],
         ];

@@ -9,6 +9,7 @@ return [
     'google_drive_hint' => 'For Google Drive, share the destination folder with your service account email (from the JSON key) as Editor.',
 
     'config_heading' => 'Current configuration',
+    'config_subheading' => 'Read-only summary of effective settings',
     'section_general' => 'General',
     'section_database' => 'Database dump',
     'section_storage' => 'Storage archive',

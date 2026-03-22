@@ -38,6 +38,7 @@ class BackupRunner
         File::ensureDirectoryExists($tempDir);
 
         $timestamp = date('YmdHis');
+        $dateFolder = date('Ymd');
         $artifacts = ['database' => null, 'storage' => null];
 
         $dbFileName = null;
@@ -68,8 +69,8 @@ class BackupRunner
         }
 
         return [
-            'database' => $dbFileName,
-            'storage' => $storageFileName,
+            'database' => $dbFileName !== null ? "{$dateFolder}/{$dbFileName}" : null,
+            'storage' => $storageFileName !== null ? "{$dateFolder}/{$storageFileName}" : null,
         ];
     }
 

@@ -22,6 +22,14 @@ class LocalDestination
         return storage_path('app/backups');
     }
 
+    /**
+     * Current backup day folder name (YYYYMMDD).
+     */
+    public function dateFolderName(): string
+    {
+        return date('Ymd');
+    }
+
     public function store(string $sourcePath, string $fileName): string
     {
         $dir = $this->basePath();
@@ -29,7 +37,12 @@ class LocalDestination
             throw new RuntimeException("Could not create local backup directory: {$dir}");
         }
 
-        $target = $dir.DIRECTORY_SEPARATOR.$fileName;
+        $dayDir = $dir.DIRECTORY_SEPARATOR.$this->dateFolderName();
+        if (! is_dir($dayDir) && ! mkdir($dayDir, 0755, true) && ! is_dir($dayDir)) {
+            throw new RuntimeException("Could not create local backup day directory: {$dayDir}");
+        }
+
+        $target = $dayDir.DIRECTORY_SEPARATOR.$fileName;
 
         if (! copy($sourcePath, $target)) {
             throw new RuntimeException("Failed to copy backup to local path: {$target}");
@@ -49,21 +62,41 @@ class LocalDestination
         }
 
         $items = [];
+
         foreach (scandir($dir) ?: [] as $name) {
             if ($name === '.' || $name === '..') {
                 continue;
             }
-            if (! str_starts_with($name, $prefix.'-')) {
-                continue;
-            }
+
             $path = $dir.DIRECTORY_SEPARATOR.$name;
-            if (! is_file($path)) {
+
+            if (is_file($path) && str_starts_with($name, $prefix.'-')) {
+                $items[] = [
+                    'path' => $path,
+                    'mtime' => (int) filemtime($path),
+                ];
+
                 continue;
             }
-            $items[] = [
-                'path' => $path,
-                'mtime' => (int) filemtime($path),
-            ];
+
+            if (is_dir($path) && preg_match('/^\d{8}$/', $name) === 1) {
+                foreach (scandir($path) ?: [] as $inner) {
+                    if ($inner === '.' || $inner === '..') {
+                        continue;
+                    }
+                    if (! str_starts_with($inner, $prefix.'-')) {
+                        continue;
+                    }
+                    $innerPath = $path.DIRECTORY_SEPARATOR.$inner;
+                    if (! is_file($innerPath)) {
+                        continue;
+                    }
+                    $items[] = [
+                        'path' => $innerPath,
+                        'mtime' => (int) filemtime($innerPath),
+                    ];
+                }
+            }
         }
 
         usort($items, fn (array $a, array $b): int => $b['mtime'] <=> $a['mtime']);

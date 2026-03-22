@@ -127,6 +127,7 @@ class ManageBackups extends Page
                 'rows' => [
                     __('filament-backup::page.label_local_enabled') => $bool((bool) config('filament-backup.local.enabled', true)),
                     __('filament-backup::page.label_local_path') => $localPath,
+                    __('filament-backup::page.label_backup_date_folders') => 'YYYYMMDD / '.app(LocalDestination::class)->dateFolderName(),
                 ],
             ],
             [
@@ -135,6 +136,7 @@ class ManageBackups extends Page
                     __('filament-backup::page.label_gdrive_enabled') => $bool((bool) config('filament-backup.google_drive.enabled', false)),
                     __('filament-backup::page.label_gdrive_credentials') => $credDisplay,
                     __('filament-backup::page.label_gdrive_folder') => $folderDisplay,
+                    __('filament-backup::page.label_backup_date_folders') => 'YYYYMMDD / '.app(LocalDestination::class)->dateFolderName(),
                 ],
             ],
             [

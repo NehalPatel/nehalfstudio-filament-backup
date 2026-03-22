@@ -22,9 +22,11 @@ class GoogleDriveDestination
             throw new RuntimeException('Google Drive folder_id is not configured.');
         }
 
+        $dateFolderId = $this->getOrCreateDateFolder($service, $folderId, date('Ymd'));
+
         $metadata = new DriveFile([
             'name' => $fileName,
-            'parents' => [$folderId],
+            'parents' => [$dateFolderId],
         ]);
 
         $content = file_get_contents($sourcePath);
@@ -50,8 +52,26 @@ class GoogleDriveDestination
         $service = $this->driveService();
         $folderId = (string) config('filament-backup.google_drive.folder_id', '');
 
-        $escaped = str_replace("'", "\\'", $folderId);
-        $q = "'{$escaped}' in parents and trashed = false";
+        $matched = $this->listBackupFilesInFolder($service, $folderId, $prefix);
+
+        foreach ($this->listDateSubfolders($service, $folderId) as $subId) {
+            $matched = array_merge($matched, $this->listBackupFilesInFolder($service, $subId, $prefix));
+        }
+
+        usort($matched, function (array $a, array $b): int {
+            return strcmp($b['createdTime'], $a['createdTime']);
+        });
+
+        return $matched;
+    }
+
+    /**
+     * @return array<int, array{id: string, name: string, createdTime: string}>
+     */
+    protected function listBackupFilesInFolder(Drive $service, string $parentId, string $prefix): array
+    {
+        $escaped = str_replace("'", "\\'", $parentId);
+        $q = "'{$escaped}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'";
 
         $matched = [];
         $pageToken = null;
@@ -84,11 +104,79 @@ class GoogleDriveDestination
             $pageToken = $response->getNextPageToken();
         } while ($pageToken !== null);
 
-        usort($matched, function (array $a, array $b): int {
-            return strcmp($b['createdTime'], $a['createdTime']);
-        });
-
         return $matched;
+    }
+
+    /**
+     * @return array<int, string> Folder IDs named YYYYMMDD under parent.
+     */
+    protected function listDateSubfolders(Drive $service, string $parentFolderId): array
+    {
+        $escaped = str_replace("'", "\\'", $parentFolderId);
+        $q = "'{$escaped}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false";
+
+        $ids = [];
+        $pageToken = null;
+
+        do {
+            $params = [
+                'q' => $q,
+                'fields' => 'nextPageToken, files(id, name)',
+                'pageSize' => 100,
+            ];
+            if ($pageToken !== null) {
+                $params['pageToken'] = $pageToken;
+            }
+
+            $response = $service->files->listFiles($params);
+            $files = $response->getFiles() ?? [];
+
+            foreach ($files as $file) {
+                $name = (string) $file->getName();
+                if (preg_match('/^\d{8}$/', $name) === 1) {
+                    $ids[] = (string) $file->getId();
+                }
+            }
+
+            $pageToken = $response->getNextPageToken();
+        } while ($pageToken !== null);
+
+        return $ids;
+    }
+
+    protected function getOrCreateDateFolder(Drive $service, string $parentFolderId, string $dateYmd): string
+    {
+        if (preg_match('/^\d{8}$/', $dateYmd) !== 1) {
+            throw new RuntimeException('Invalid backup date folder name.');
+        }
+
+        $escapedParent = str_replace("'", "\\'", $parentFolderId);
+        $escapedName = str_replace("'", "\\'", $dateYmd);
+        $q = "'{$escapedParent}' in parents and mimeType = 'application/vnd.google-apps.folder' and name = '{$escapedName}' and trashed = false";
+
+        $response = $service->files->listFiles([
+            'q' => $q,
+            'fields' => 'files(id, name)',
+            'pageSize' => 5,
+        ]);
+
+        $files = $response->getFiles() ?? [];
+        if (count($files) > 0) {
+            return (string) $files[0]->getId();
+        }
+
+        $folder = new DriveFile([
+            'name' => $dateYmd,
+            'mimeType' => 'application/vnd.google-apps.folder',
+            'parents' => [$parentFolderId],
+        ]);
+        $created = $service->files->create($folder, ['fields' => 'id']);
+        $id = $created->getId();
+        if ($id === null || $id === '') {
+            throw new RuntimeException('Could not create Google Drive date folder.');
+        }
+
+        return (string) $id;
     }
 
     public function delete(string $fileId): void

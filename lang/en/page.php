@@ -27,6 +27,7 @@ return [
     'label_storage_excludes' => 'Excluded paths (relative)',
     'label_local_enabled' => 'Local backups enabled',
     'label_local_path' => 'Local path',
+    'label_backup_date_folders' => 'Per-run folder (under path / Drive)',
     'label_gdrive_enabled' => 'Drive uploads enabled',
     'label_gdrive_credentials' => 'Service account key',
     'label_gdrive_folder' => 'Folder ID',

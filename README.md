@@ -1,6 +1,6 @@
 # nehalfstudio/filament-backup
 
-Laravel **Filament v5** admin backups: MySQL/MariaDB (`mysqldump`) or SQLite file copy, ZIP of `storage/app` (configurable), **local** and/or **Google Drive** destinations, **retention** (default last 3 per kind per destination), **synchronous** runs from the panel and CLI, and an optional **scheduler**.
+Laravel **Filament v5** admin backups: MySQL/MariaDB (`mysqldump`) or SQLite file copy, ZIP of `storage/app` (configurable), **local** and/or **Google Drive** destinations, **retention** (default last 3 per kind per destination), **synchronous** runs from the panel and CLI, and an optional **scheduler**. Each run stores files under a **`YYYYMMDD`** subfolder (created automatically) inside your local path and/or under your configured Drive folder.
 
 Backups from the Filament UI and from `php artisan filament-backup:run` execute **in the current PHP process** (no queue job). Plan for **PHP `max_execution_time`** and web server timeouts on large sites.
 

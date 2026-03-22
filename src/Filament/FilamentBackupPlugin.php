@@ -40,7 +40,7 @@ class FilamentBackupPlugin implements Plugin
     }
 
     /**
-     * Restrict access to the backups page (same idea as juniyasyos/filament-backup).
+     * Restrict access to the backups page.
      * When set, this runs after the user is authenticated and overrides gate-based checks.
      */
     public function authorize(?Closure $callback): static

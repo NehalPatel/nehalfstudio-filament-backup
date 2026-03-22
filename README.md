@@ -42,7 +42,7 @@ return $panel
     ->plugin(FilamentBackupPlugin::make());
 ```
 
-### Fluent plugin options (similar to [juniyasyos/filament-backup](https://packagist.org/packages/juniyasyos/filament-backup))
+### Fluent plugin options
 
 Chain configuration on the plugin instance:
 
@@ -145,15 +145,6 @@ The dumper uses the `MYSQL_PWD` environment variable for the `mysqldump` process
 ## RAR
 
 Archives use **ZIP** (`ZipArchive`) only. RAR creation is not supported without external proprietary tools.
-
-## Comparison with `juniyasyos/filament-backup`
-
-| | [juniyasyos/filament-backup](https://packagist.org/packages/juniyasyos/filament-backup) | this package |
-|---|----------------------------------------------------------------------------------------|--------------|
-| Filament | v4 | **v5** |
-| Backup engine | [spatie/laravel-backup](https://github.com/spatie/laravel-backup) | Built-in `mysqldump` / SQLite + storage ZIP |
-| Google Drive / retention | Via Spatie disks & config | First-class in package config |
-| Plugin API | `::make()`, `authorize`, `usingQueue`, `timeout`, polling | **Same ideas** (`make()`, `authorize`, `usingQueue`, `timeout` / `noTimeout`, `usingPollingInterval`, `usingPage`) |
 
 ## License
 

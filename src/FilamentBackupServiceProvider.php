@@ -2,10 +2,12 @@
 
 namespace NehalfStudio\FilamentBackup;
 
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
 use NehalfStudio\FilamentBackup\Commands\RunBackupCommand;
-use NehalfStudio\FilamentBackup\Jobs\RunBackupJob;
+use NehalfStudio\FilamentBackup\Services\BackupRunner;
+use Throwable;
 
 class FilamentBackupServiceProvider extends ServiceProvider
 {
@@ -17,6 +19,7 @@ class FilamentBackupServiceProvider extends ServiceProvider
         );
 
         $this->app->singleton(Services\BackupRunner::class);
+        $this->app->singleton(Services\BackupNotifier::class);
     }
 
     public function boot(): void
@@ -57,10 +60,14 @@ class FilamentBackupServiceProvider extends ServiceProvider
             }
 
             $type = (string) config('filament-backup.schedule.type', 'both');
-            $job = RunBackupJob::forSchedule($type);
 
-            $event = Schedule::job($job)
-                ->cron((string) config('filament-backup.schedule.expression', '0 2 * * *'));
+            $event = Schedule::call(function () use ($type): void {
+                try {
+                    app(BackupRunner::class)->run($type);
+                } catch (Throwable $e) {
+                    Log::error('filament-backup scheduled backup failed: '.$e->getMessage(), ['exception' => $e]);
+                }
+            })->cron((string) config('filament-backup.schedule.expression', '0 2 * * *'));
 
             if (config('filament-backup.schedule.without_overlapping')) {
                 $event->withoutOverlapping(

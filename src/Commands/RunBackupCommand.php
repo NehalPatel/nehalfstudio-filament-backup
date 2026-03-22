@@ -3,17 +3,14 @@
 namespace NehalfStudio\FilamentBackup\Commands;
 
 use Illuminate\Console\Command;
-use NehalfStudio\FilamentBackup\Jobs\RunBackupJob;
 use NehalfStudio\FilamentBackup\Services\BackupRunner;
 use Throwable;
 
 class RunBackupCommand extends Command
 {
-    protected $signature = 'filament-backup:run
-                            {type=both : database, storage, or both}
-                            {--sync : Run in the current process instead of the queue}';
+    protected $signature = 'filament-backup:run {type=both : database, storage, or both}';
 
-    protected $description = 'Create database and/or storage backups per filament-backup config.';
+    protected $description = 'Create database and/or storage backups synchronously in the current process.';
 
     public function handle(BackupRunner $runner): int
     {
@@ -24,26 +21,19 @@ class RunBackupCommand extends Command
             return self::INVALID;
         }
 
-        if ($this->option('sync')) {
-            try {
-                $result = $runner->run($type);
-                $this->info('Backup completed.');
-                foreach ($result as $key => $name) {
-                    if ($name !== null) {
-                        $this->line("  {$key}: {$name}");
-                    }
+        try {
+            $result = $runner->run($type);
+            $this->info('Backup completed.');
+            foreach ($result as $key => $name) {
+                if ($name !== null) {
+                    $this->line("  {$key}: {$name}");
                 }
-            } catch (Throwable $e) {
-                $this->error($e->getMessage());
-
-                return self::FAILURE;
             }
+        } catch (Throwable $e) {
+            $this->error($e->getMessage());
 
-            return self::SUCCESS;
+            return self::FAILURE;
         }
-
-        RunBackupJob::dispatch($type, 'cli', null);
-        $this->info('Backup job queued.');
 
         return self::SUCCESS;
     }

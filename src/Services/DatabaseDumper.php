@@ -31,7 +31,7 @@ class DatabaseDumper
      */
     protected function dumpMysql(array $config, string $targetPath): void
     {
-        $binary = (string) config('filament-backup.database.mysqldump_path', 'mysqldump');
+        $binary = $this->resolveMysqldumpBinary();
         $database = (string) ($config['database'] ?? '');
         $user = (string) ($config['username'] ?? '');
         $password = (string) ($config['password'] ?? '');
@@ -82,5 +82,34 @@ class DatabaseDumper
         if (! copy($database, $targetPath)) {
             throw new RuntimeException('Failed to copy SQLite database to backup path.');
         }
+    }
+
+    /**
+     * Use configured path, or on Windows try common XAMPP / PHP sibling layouts when default "mysqldump" is not on PATH.
+     */
+    protected function resolveMysqldumpBinary(): string
+    {
+        $configured = trim((string) config('filament-backup.database.mysqldump_path', 'mysqldump'));
+
+        if ($configured !== '' && $configured !== 'mysqldump') {
+            return $configured;
+        }
+
+        if (PHP_OS_FAMILY === 'Windows') {
+            $phpDir = dirname(PHP_BINARY);
+            $candidates = [
+                'C:\\xampp\\mysql\\bin\\mysqldump.exe',
+                $phpDir.'\\..\\mysql\\bin\\mysqldump.exe',
+                $phpDir.'\\..\\..\\mysql\\bin\\mysqldump.exe',
+            ];
+            foreach ($candidates as $path) {
+                $resolved = realpath($path);
+                if ($resolved !== false && is_file($resolved)) {
+                    return $resolved;
+                }
+            }
+        }
+
+        return $configured === '' ? 'mysqldump' : $configured;
     }
 }

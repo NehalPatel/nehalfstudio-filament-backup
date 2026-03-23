@@ -25,7 +25,7 @@ From [Packagist](https://packagist.org/packages/nehalfstudio/filament-backup):
 composer require nehalfstudio/filament-backup
 ```
 
-If you only have a `dev-main` release and Composer complains about stability, you can require it explicitly, for example:
+Stable line is now available (`v1.0.0+`). For the latest unreleased changes only, you can still use:
 
 ```bash
 composer require nehalfstudio/filament-backup:dev-main

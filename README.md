@@ -11,7 +11,7 @@ Backups from the Filament UI and from `php artisan filament-backup:run` execute 
 - PHP **8.2+**
 - Laravel **12** / Filament **v5**
 - **MySQL/MariaDB:** `mysqldump` available on `PATH`, or set `FILAMENT_BACKUP_MYSQLDUMP_PATH` (common on Windows/XAMPP).
-- **Google Drive (optional):** Google Cloud project with Drive API enabled and a **service account** JSON key—not a Gmail password.
+- **Google Drive (optional):** Google Cloud project with Drive API enabled. **Recommended:** **OAuth 2.0** (OAuth client JSON + refresh token) so backups use **your** personal Google account storage. **Service accounts** are **not** suitable for normal `@gmail.com` “My Drive” (effectively **no quota** there); use a service account only with **Google Workspace** / **Shared drives** where your org provisions storage.
 
 ---
 
@@ -64,7 +64,7 @@ If notifications are missing, the package still shows **toast** notifications in
 
 ### 5. Environment variables
 
-Copy the variables you need into `.env` (full list in [Configuration](#configuration-environment-variables)). At minimum, set a **local backup path** if you do not want the default `storage/app/backups`, and configure **Google Drive** if you use it.
+Copy the variables you need into `.env` (full list in [Configuration](#configuration-environment-variables)). At minimum, set a **local backup path** if you do not want the default `storage/app/backups`. For **Google Drive** with a personal Gmail account, use **OAuth** (see [Google Drive setup](#google-drive-setup-recommended-oauth)); do not rely on a service account for personal “My Drive.”
 
 ### 6. Clear config cache
 
@@ -116,8 +116,9 @@ If `authorize()` is set, it runs for authenticated users and **takes precedence*
 | `FILAMENT_BACKUP_LOCAL_ENABLED` | `true` / `false` — write backups to the local path. |
 | `FILAMENT_BACKUP_LOCAL_PATH` | Directory for local files; empty = `storage/app/backups`. Use forward slashes or quoted paths on Windows (e.g. `"F:/My Backups"`). |
 | `FILAMENT_BACKUP_GDRIVE_ENABLED` | `true` / `false`. |
-| `FILAMENT_BACKUP_GDRIVE_CREDENTIALS` | Absolute path to the **service account** JSON key file. |
-| `FILAMENT_BACKUP_GDRIVE_FOLDER_ID` | Target Drive folder ID (from the folder URL). |
+| `FILAMENT_BACKUP_GDRIVE_CREDENTIALS` | **Recommended (personal Gmail):** absolute path to **OAuth client** JSON from Google Cloud (`installed` / `web`). **Alternative (Workspace / Shared Drive only):** service account JSON. |
+| `FILAMENT_BACKUP_GDRIVE_REFRESH_TOKEN` | **Required** with OAuth client JSON (`php artisan filament-backup:google-auth`). Leave empty when using a service account. |
+| `FILAMENT_BACKUP_GDRIVE_FOLDER_ID` | Folder ID from the Drive URL (a folder **you** own for OAuth; shared with the service account for service-account mode). |
 | `FILAMENT_BACKUP_SCHEDULE_ENABLED` | `true` registers a scheduled backup (default `false`). |
 | `FILAMENT_BACKUP_SCHEDULE_CRON` | Cron expression (default `0 2 * * *`). |
 | `FILAMENT_BACKUP_SCHEDULE_TYPE` | `database`, `storage`, or `both`. |
@@ -129,9 +130,40 @@ Excluded from the storage ZIP by default (see `config/filament-backup.php`): `te
 
 ---
 
-## Google Drive credentials (service account)
+## Google Drive setup (recommended: OAuth)
 
-This package uses the **Google Drive API** with a **service account**. Your personal Gmail **password is not used** and should not be placed in `.env` for this feature.
+For **personal `@gmail.com`** (or any consumer Google account), use **OAuth 2.0** only. **Service accounts do not get your personal Drive quota**; uploads to “My Drive” as a service account will fail or misbehave. With OAuth, backups run as **you** and use **your** storage.
+
+### OAuth quick steps
+
+1. In [Google Cloud Console](https://console.cloud.google.com/) → **APIs & Services → Credentials**, create **OAuth client ID** (type **Desktop app** or **Web application**).
+2. If you use **Web application**, add an authorized redirect URI (must match the command exactly), for example: `http://127.0.0.1:8765/`
+3. Download the client JSON (e.g. `client_secret_….json`) and store it outside the web root.
+4. Run once on your machine:
+
+```bash
+php artisan config:clear
+php artisan filament-backup:google-auth --credentials=/absolute/path/to/client_secret….json
+```
+
+5. Paste the authorization code from the browser when prompted. Add the printed lines to `.env`:
+
+```env
+FILAMENT_BACKUP_GDRIVE_CREDENTIALS=/absolute/path/to/client_secret….json
+FILAMENT_BACKUP_GDRIVE_REFRESH_TOKEN=…
+FILAMENT_BACKUP_GDRIVE_FOLDER_ID=folder_id_from_your_drive_url
+FILAMENT_BACKUP_GDRIVE_ENABLED=true
+```
+
+Use a folder **you** create in **your** Drive. You do **not** share it with a service account when using OAuth.
+
+---
+
+## Google Drive — service account (optional: Workspace / Shared Drive only)
+
+> **Not for personal Gmail “My Drive.”** Google does not give consumer personal storage quota to service accounts. Use **[OAuth](#google-drive-setup-recommended-oauth)** for `@gmail.com` backups.
+
+Use a **service account** only when your organization uses **Google Workspace** and **Shared drives** (or another setup where the service account can write without relying on personal Gmail quota). Your Gmail **password** is never stored in `.env`.
 
 ### Step 1 — Google Cloud project
 
@@ -197,6 +229,8 @@ php artisan filament-backup:run           # default: both
 php artisan filament-backup:run database
 php artisan filament-backup:run storage
 php artisan filament-backup:run both
+
+php artisan filament-backup:google-auth   # recommended: OAuth refresh token for personal Drive quota
 ```
 
 All modes run **synchronously** in the current process.

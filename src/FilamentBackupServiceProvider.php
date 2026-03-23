@@ -5,6 +5,7 @@ namespace NehalfStudio\FilamentBackup;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\ServiceProvider;
+use NehalfStudio\FilamentBackup\Commands\GoogleDriveAuthCommand;
 use NehalfStudio\FilamentBackup\Commands\RunBackupCommand;
 use NehalfStudio\FilamentBackup\Services\BackupRunner;
 use Throwable;
@@ -42,6 +43,7 @@ class FilamentBackupServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 RunBackupCommand::class,
+                GoogleDriveAuthCommand::class,
             ]);
         }
 

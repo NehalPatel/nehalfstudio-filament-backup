@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Log;
 use NehalfStudio\FilamentBackup\Filament\FilamentBackupPlugin;
 use NehalfStudio\FilamentBackup\Services\BackupNotifier;
 use NehalfStudio\FilamentBackup\Services\BackupRunner;
+use NehalfStudio\FilamentBackup\Services\GoogleDriveDestination;
 use NehalfStudio\FilamentBackup\Services\LocalDestination;
 use Throwable;
 use UnitEnum;
@@ -92,11 +93,43 @@ class ManageBackups extends Page
         $credPresent = 'muted';
         if (is_string($credPath) && trim($credPath) !== '') {
             if (is_file($credPath)) {
+                $credMeta = GoogleDriveDestination::credentialsFileKind($credPath);
+                $credTypeLabel = match ($credMeta['kind']) {
+                    'service_account' => __('filament-backup::page.credentials_type_service_account'),
+                    'oauth' => __('filament-backup::page.credentials_type_oauth'),
+                    'invalid' => __('filament-backup::page.credentials_type_invalid'),
+                    'unknown' => __('filament-backup::page.credentials_type_unknown'),
+                    default => '',
+                };
                 $credDisplay = __('filament-backup::page.credentials_file_ok', ['file' => basename($credPath)]);
-                $credPresent = 'success';
+                if ($credTypeLabel !== '') {
+                    $credDisplay .= ' — '.$credTypeLabel;
+                }
+                $credPresent = in_array($credMeta['kind'], ['invalid', 'unknown'], true) ? 'danger' : 'success';
             } else {
                 $credDisplay = __('filament-backup::page.credentials_file_missing', ['file' => basename($credPath)]);
                 $credPresent = 'danger';
+            }
+        }
+
+        $oauthRefreshRow = null;
+        if (is_string($credPath) && trim($credPath) !== '' && is_file($credPath)) {
+            $kind = GoogleDriveDestination::credentialsFileKind($credPath)['kind'];
+            $refreshToken = (string) config('filament-backup.google_drive.oauth_refresh_token', '');
+            if ($kind === 'oauth') {
+                $oauthRefreshRow = $this->configItem(
+                    __('filament-backup::page.label_gdrive_refresh'),
+                    trim($refreshToken) !== ''
+                        ? __('filament-backup::page.refresh_token_configured')
+                        : __('filament-backup::page.refresh_token_missing'),
+                    trim($refreshToken) !== '' ? 'success' : 'danger',
+                );
+            } elseif ($kind === 'service_account') {
+                $oauthRefreshRow = $this->configItem(
+                    __('filament-backup::page.label_gdrive_refresh'),
+                    __('filament-backup::page.refresh_token_na_service_account'),
+                    'muted',
+                );
             }
         }
 
@@ -191,6 +224,7 @@ class ManageBackups extends Page
                         $boolPresent((bool) config('filament-backup.google_drive.enabled', false))
                     ),
                     $this->configItem(__('filament-backup::page.label_gdrive_credentials'), $credDisplay, $credPresent),
+                    ...($oauthRefreshRow !== null ? [$oauthRefreshRow] : []),
                     $this->configItem(__('filament-backup::page.label_gdrive_folder'), $folderDisplay, $folderPresent),
                     $this->configItem(__('filament-backup::page.label_backup_date_folders'), $dateFolderLine, 'code'),
                 ],

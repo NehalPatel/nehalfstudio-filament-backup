@@ -60,12 +60,16 @@ return [
 
     /*
     |--------------------------------------------------------------------------
-    | Google Drive (service account JSON)
+    | Google Drive
     |--------------------------------------------------------------------------
+    | Recommended for personal @gmail.com: OAuth client JSON (installed / web) plus
+    | FILAMENT_BACKUP_GDRIVE_REFRESH_TOKEN from `php artisan filament-backup:google-auth`.
+    | Service account JSON is for Workspace / Shared Drive only (not personal My Drive quota).
     */
     'google_drive' => [
         'enabled' => filter_var(env('FILAMENT_BACKUP_GDRIVE_ENABLED', false), FILTER_VALIDATE_BOOLEAN),
         'credentials_json' => env('FILAMENT_BACKUP_GDRIVE_CREDENTIALS'),
+        'oauth_refresh_token' => env('FILAMENT_BACKUP_GDRIVE_REFRESH_TOKEN'),
         'folder_id' => env('FILAMENT_BACKUP_GDRIVE_FOLDER_ID'),
     ],
 

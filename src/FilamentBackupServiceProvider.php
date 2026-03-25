@@ -2,11 +2,18 @@
 
 namespace NehalfStudio\FilamentBackup;
 
+use Filament\Support\Assets\Css;
+use Filament\Support\Facades\FilamentAsset;
+use Filament\Support\Facades\FilamentView;
+use Filament\View\PanelsRenderHook;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schedule;
+use Illuminate\Support\HtmlString;
 use Illuminate\Support\ServiceProvider;
+use Livewire\Livewire;
 use NehalfStudio\FilamentBackup\Commands\GoogleDriveAuthCommand;
 use NehalfStudio\FilamentBackup\Commands\RunBackupCommand;
+use NehalfStudio\FilamentBackup\Filament\Pages\ManageBackups;
 use NehalfStudio\FilamentBackup\Services\BackupRunner;
 use Throwable;
 
@@ -21,6 +28,13 @@ class FilamentBackupServiceProvider extends ServiceProvider
 
         $this->app->singleton(Services\BackupRunner::class);
         $this->app->singleton(Services\BackupNotifier::class);
+
+        FilamentAsset::register([
+            Css::make(
+                'manage-backups-page',
+                dirname(__DIR__).'/dist/manage-backups-page.css',
+            )->loadedOnRequest(),
+        ], package: 'nehalfstudio-filament-backup');
     }
 
     public function boot(): void
@@ -47,7 +61,32 @@ class FilamentBackupServiceProvider extends ServiceProvider
             ]);
         }
 
+        $this->registerManageBackupsStyles();
+
         $this->registerSchedule();
+    }
+
+    protected function registerManageBackupsStyles(): void
+    {
+        FilamentView::registerRenderHook(
+            PanelsRenderHook::STYLES_AFTER,
+            function (): HtmlString|string {
+                $component = Livewire::current();
+                if (! $component instanceof ManageBackups) {
+                    return '';
+                }
+
+                try {
+                    $href = FilamentAsset::getStyleHref('manage-backups-page', 'nehalfstudio-filament-backup');
+                } catch (Throwable) {
+                    return '';
+                }
+
+                return new HtmlString(
+                    '<link href="'.e($href).'" rel="stylesheet" data-navigate-track />'
+                );
+            },
+        );
     }
 
     protected function registerSchedule(): void

@@ -1,0 +1,10 @@
+{
+    "private": true,
+    "scripts": {
+        "build:css": "npx @tailwindcss/cli@4 -i ./resources/build/manage-backups.tw.css -o ./dist/manage-backups-page.css -m"
+    },
+    "devDependencies": {
+        "@tailwindcss/cli": "^4.1.0",
+        "tailwindcss": "^4.1.0"
+    }
+}

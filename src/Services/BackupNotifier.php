@@ -12,29 +12,33 @@ class BackupNotifier
     /**
      * @param  array{database: ?string, storage: ?string}  $result
      */
-    public function notifyCompleted(?Authenticatable $user, array $result): void
+    public function notifyCompleted(?Authenticatable $user, array $result, bool $broadcastSessionToast = true): void
     {
         $parts = array_filter($result);
         $body = $parts === []
             ? __('filament-backup::notifications.completed_body')
             : __('filament-backup::notifications.completed_with_files', ['files' => implode(', ', $parts)]);
 
-        Notification::make()
-            ->title(__('filament-backup::notifications.completed_title'))
-            ->body($body)
-            ->success()
-            ->send();
+        if ($broadcastSessionToast) {
+            Notification::make()
+                ->title(__('filament-backup::notifications.completed_title'))
+                ->body($body)
+                ->success()
+                ->send();
+        }
 
         $this->sendDatabaseSuccess($user, $body);
     }
 
-    public function notifyFailed(?Authenticatable $user, Throwable $e): void
+    public function notifyFailed(?Authenticatable $user, Throwable $e, bool $broadcastSessionToast = true): void
     {
-        Notification::make()
-            ->title(__('filament-backup::notifications.failed_title'))
-            ->body($e->getMessage())
-            ->danger()
-            ->send();
+        if ($broadcastSessionToast) {
+            Notification::make()
+                ->title(__('filament-backup::notifications.failed_title'))
+                ->body($e->getMessage())
+                ->danger()
+                ->send();
+        }
 
         $this->sendDatabaseFailure($user, $e);
     }

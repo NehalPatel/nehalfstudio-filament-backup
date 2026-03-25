@@ -22,6 +22,8 @@ class BackupRunner
      */
     public function run(string $type): array
     {
+        $this->applyMaxExecutionTimeLimit();
+
         $type = strtolower($type);
         if (! in_array($type, ['database', 'storage', 'both'], true)) {
             throw new RuntimeException("Invalid backup type [{$type}]. Use database, storage, or both.");
@@ -72,6 +74,27 @@ class BackupRunner
             'database' => $dbFileName !== null ? "{$dateFolder}/{$dbFileName}" : null,
             'storage' => $storageFileName !== null ? "{$dateFolder}/{$storageFileName}" : null,
         ];
+    }
+
+    protected function applyMaxExecutionTimeLimit(): void
+    {
+        $limit = config('filament-backup.max_execution_seconds');
+
+        if ($limit === null) {
+            return;
+        }
+
+        $limit = (int) $limit;
+
+        if ($limit === 0) {
+            @set_time_limit(0);
+
+            return;
+        }
+
+        if ($limit > 0) {
+            @set_time_limit($limit);
+        }
     }
 
     protected function createDatabaseArtifact(string $tempDir, string $timestamp, ?string &$finalName): string
@@ -146,14 +169,15 @@ class BackupRunner
     {
         $keep = max(1, (int) config('filament-backup.retention_count', 3));
 
-        if ($this->localDestination->isEnabled()) {
-            $this->localDestination->store($tempPath, $fileName);
-            $this->localDestination->prune($prefix, $keep);
-        }
-
+        // Google Drive reads from temp first so LocalDestination can `rename()` the file off temp without breaking Drive.
         if ($this->googleDriveDestination->isEnabled()) {
             $this->googleDriveDestination->store($tempPath, $fileName);
             $this->googleDriveDestination->prune($prefix, $keep);
+        }
+
+        if ($this->localDestination->isEnabled()) {
+            $this->localDestination->store($tempPath, $fileName);
+            $this->localDestination->prune($prefix, $keep);
         }
     }
 }

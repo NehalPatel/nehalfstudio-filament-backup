@@ -44,6 +44,15 @@ class LocalDestination
 
         $target = $dayDir.DIRECTORY_SEPARATOR.$fileName;
 
+        // Prefer rename (same volume) to avoid duplicating large files; fall back to copy (e.g. cross-device).
+        if (@rename($sourcePath, $target)) {
+            return $target;
+        }
+
+        if (! is_file($sourcePath)) {
+            throw new RuntimeException("Backup source file is missing after move attempt: {$sourcePath}");
+        }
+
         if (! copy($sourcePath, $target)) {
             throw new RuntimeException("Failed to copy backup to local path: {$target}");
         }

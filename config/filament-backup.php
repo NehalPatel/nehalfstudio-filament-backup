@@ -13,6 +13,36 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | PHP max_execution_time (optional)
+    |--------------------------------------------------------------------------
+    | Applied at the start of each BackupRunner::run() (panel sync, queue job,
+    | artisan command, and scheduled runs). null = do not call set_time_limit.
+    | 0 = unlimited (@set_time_limit(0)). Ignored on hosts that disable it.
+    */
+    'max_execution_seconds' => ($v = env('FILAMENT_BACKUP_MAX_EXECUTION')) !== null && $v !== ''
+        ? (int) $v
+        : null,
+
+    /*
+    |--------------------------------------------------------------------------
+    | Panel UI: queue backups
+    |--------------------------------------------------------------------------
+    | When true, Filament backup actions dispatch RunFilamentBackupJob. Requires
+    | a running queue worker unless QUEUE_CONNECTION=sync (sync still runs in
+    | the HTTP request and can hit web timeouts).
+    */
+    'use_queue_for_ui' => filter_var(env('FILAMENT_BACKUP_UI_USE_QUEUE', true), FILTER_VALIDATE_BOOLEAN),
+
+    /*
+    |--------------------------------------------------------------------------
+    | Queue job timeout (seconds)
+    |--------------------------------------------------------------------------
+    | Laravel worker must use --timeout greater than or equal to this value.
+    */
+    'queue_timeout_seconds' => (int) env('FILAMENT_BACKUP_QUEUE_TIMEOUT', 7200),
+
+    /*
+    |--------------------------------------------------------------------------
     | Database
     |--------------------------------------------------------------------------
     */

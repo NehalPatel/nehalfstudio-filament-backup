@@ -5,10 +5,12 @@ namespace NehalfStudio\FilamentBackup\Filament\Pages;
 use BackedEnum;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Notifications\Notification;
 use Filament\Pages\Page;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Log;
 use NehalfStudio\FilamentBackup\Filament\FilamentBackupPlugin;
+use NehalfStudio\FilamentBackup\Jobs\RunFilamentBackupJob;
 use NehalfStudio\FilamentBackup\Services\BackupNotifier;
 use NehalfStudio\FilamentBackup\Services\BackupRunner;
 use NehalfStudio\FilamentBackup\Services\GoogleDriveDestination;
@@ -290,14 +292,14 @@ class ManageBackups extends Page
                 ->icon('heroicon-o-circle-stack')
                 ->requiresConfirmation()
                 ->action(function (BackupRunner $runner, BackupNotifier $notifier): void {
-                    $this->runBackupSync($runner, $notifier, 'database');
+                    $this->runBackupFromPanel($runner, $notifier, 'database');
                 }),
             Action::make('backupStorage')
                 ->label(__('filament-backup::actions.backup_storage'))
                 ->icon('heroicon-o-archive-box')
                 ->requiresConfirmation()
                 ->action(function (BackupRunner $runner, BackupNotifier $notifier): void {
-                    $this->runBackupSync($runner, $notifier, 'storage');
+                    $this->runBackupFromPanel($runner, $notifier, 'storage');
                 }),
             Action::make('backupBoth')
                 ->label(__('filament-backup::actions.backup_full'))
@@ -305,9 +307,26 @@ class ManageBackups extends Page
                 ->color('primary')
                 ->requiresConfirmation()
                 ->action(function (BackupRunner $runner, BackupNotifier $notifier): void {
-                    $this->runBackupSync($runner, $notifier, 'both');
+                    $this->runBackupFromPanel($runner, $notifier, 'both');
                 }),
         ];
+    }
+
+    protected function runBackupFromPanel(BackupRunner $runner, BackupNotifier $notifier, string $type): void
+    {
+        if (config('filament-backup.use_queue_for_ui', true)) {
+            RunFilamentBackupJob::dispatch($type, auth()->id());
+
+            Notification::make()
+                ->title(__('filament-backup::notifications.queued_title'))
+                ->body(__('filament-backup::notifications.queued_body'))
+                ->success()
+                ->send();
+
+            return;
+        }
+
+        $this->runBackupSync($runner, $notifier, $type);
     }
 
     protected function runBackupSync(BackupRunner $runner, BackupNotifier $notifier, string $type): void

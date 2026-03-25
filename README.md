@@ -1,8 +1,10 @@
 # nehalfstudio/filament-backup
 
-Laravel **Filament v5** admin backups: MySQL/MariaDB (`mysqldump`) or SQLite file copy, ZIP of `storage/app` (configurable), **local** and/or **Google Drive** destinations, **retention** (default last 3 per kind per destination), **synchronous** runs from the panel and CLI, and an optional **scheduler**. Each run stores files under a **`YYYYMMDD`** subfolder (created automatically) inside your local path and/or under your configured Drive folder.
+Laravel **Filament v5** admin backups: MySQL/MariaDB (`mysqldump`) or SQLite file copy, ZIP of `storage/app` (configurable), **local** and/or **Google Drive** destinations, **retention** (default last 3 per kind per destination), and an optional **scheduler**. Each run stores files under a **`YYYYMMDD`** subfolder (created automatically) inside your local path and/or under your configured Drive folder.
 
-Backups from the Filament UI and from `php artisan filament-backup:run` execute **in the current PHP process** (no queue job). Plan for **PHP `max_execution_time`** and web server timeouts on large sites.
+**Filament panel actions** dispatch a **queued job** by default (`RunFilamentBackupJob`), so long backups avoid the web request’s `max_execution_time`. Run a queue worker with a **timeout ≥** `FILAMENT_BACKUP_QUEUE_TIMEOUT` (see below). Local copies use **`rename()`** when possible (same volume) to skip duplicating huge files; Google Drive is written **before** the local move so the temp file stays available for upload.
+
+`php artisan filament-backup:run` and the **scheduler** still run **in the current PHP process** (CLI often has no execution time limit). Optional **`FILAMENT_BACKUP_MAX_EXECUTION`** calls `set_time_limit()` at the start of every run.
 
 ---
 
@@ -51,7 +53,21 @@ return $panel
     ->plugin(FilamentBackupPlugin::make());
 ```
 
-### 4. Database notifications (recommended)
+### 4. Publish Filament assets (required for a styled Backups page)
+
+The Backups UI ships as a **pre-built stylesheet** in the package (`dist/manage-backups-page.css`). It is copied into `public/` with the same command you use for Filament’s own assets. **You do not need to change your app’s `theme.css` or Vite config** for this package.
+
+After `composer install` / `composer update`, run:
+
+```bash
+php artisan filament:assets
+```
+
+That publishes (among other files) `public/css/nehalfstudio-filament-backup/manage-backups-page.css`. The package injects a `<link>` for it only on the **Backups** page.
+
+Re-run `php artisan filament:assets` whenever you upgrade Filament or this package.
+
+### 5. Database notifications (recommended)
 
 Success and failure messages can be stored as Filament database notifications. Your `User` model should use `Notifiable`, and you need the notifications table:
 
@@ -62,11 +78,11 @@ php artisan migrate
 
 If notifications are missing, the package still shows **toast** notifications in the panel; database delivery is skipped with a log warning.
 
-### 5. Environment variables
+### 6. Environment variables
 
 Copy the variables you need into `.env` (full list in [Configuration](#configuration-environment-variables)). At minimum, set a **local backup path** if you do not want the default `storage/app/backups`. For **Google Drive** with a personal Gmail account, use **OAuth** (see [Google Drive setup](#google-drive-setup-recommended-oauth)); do not rely on a service account for personal “My Drive.”
 
-### 6. Clear config cache
+### 7. Clear config cache
 
 After changing `.env` or config:
 
@@ -108,6 +124,9 @@ If `authorize()` is set, it runs for authenticated users and **takes precedence*
 | Variable | Default / behavior |
 |----------|-------------------|
 | `FILAMENT_BACKUP_RETENTION` | Max copies per prefix (`db-`, `storage-`) **per destination** (default `3`). |
+| `FILAMENT_BACKUP_MAX_EXECUTION` | Empty = do not change PHP time limit. `0` = `set_time_limit(0)`. Any positive integer = seconds (e.g. `3600`). May be ignored on some hosts. |
+| `FILAMENT_BACKUP_UI_USE_QUEUE` | `true` / `false` — panel backup buttons dispatch a queue job (default `true`). Set `false` to run synchronously in the request (needs high `max_execution_time` / proxy limits for large sites). |
+| `FILAMENT_BACKUP_QUEUE_TIMEOUT` | Job timeout in seconds (default `7200`). Your worker must use at least this value, e.g. `php artisan queue:work --timeout=7200`. |
 | `FILAMENT_BACKUP_DB_CONNECTION` | Empty = Laravel `database.default`. |
 | `FILAMENT_BACKUP_DB_GZIP` | `true` / `false` — gzip SQL/SQLite dumps. |
 | `FILAMENT_BACKUP_MYSQLDUMP_PATH` | Path to `mysqldump` if not on `PATH` (e.g. `C:/xampp/mysql/bin/mysqldump.exe`). |
@@ -218,7 +237,17 @@ Check the folder in Drive for a new `storage-*.zip` (or run `database` / `both` 
 
 ## Filament panel
 
-After installation, open **System → Backups** (or your navigation group). Actions run **immediately**; wait for the request to finish. Large backups may need higher `max_execution_time` (PHP) and proxy timeouts (nginx/Apache).
+After installation, open **System → Backups** (or your navigation group). With **`FILAMENT_BACKUP_UI_USE_QUEUE=true`** (default), choosing a backup shows a **“Backup queued”** toast; a queue worker runs `BackupRunner` and delivers **Filament database notifications** to the user who started the run (session toasts only appear when **`FILAMENT_BACKUP_UI_USE_QUEUE=false`** and the backup runs in the browser).
+
+**Queue worker**
+
+```bash
+php artisan queue:work --timeout=7200
+```
+
+Use a `--timeout` **≥** `FILAMENT_BACKUP_QUEUE_TIMEOUT`. If `QUEUE_CONNECTION=sync`, the job still runs **inside the HTTP request** and can hit the same **120s (or lower)** `max_execution_time` as before—use `database`, `redis`, etc., and a real worker for production.
+
+**If you must run backups synchronously from the browser**, set `FILAMENT_BACKUP_UI_USE_QUEUE=false`, raise PHP **`max_execution_time`** (e.g. in `php.ini` or your vhost), and increase **nginx** `fastcgi_read_timeout` / **Apache** `TimeOut` as needed. Optionally set **`FILAMENT_BACKUP_MAX_EXECUTION=0`** so the runner calls `set_time_limit(0)` (where allowed).
 
 ---
 
@@ -233,7 +262,7 @@ php artisan filament-backup:run both
 php artisan filament-backup:google-auth   # recommended: OAuth refresh token for personal Drive quota
 ```
 
-All modes run **synchronously** in the current process.
+All modes run **synchronously** in the current process (no queue). Optional **`FILAMENT_BACKUP_MAX_EXECUTION`** still applies at the start of `BackupRunner::run()`.
 
 ---
 
@@ -278,6 +307,21 @@ The dumper passes the database password to `mysqldump` via the `MYSQL_PWD` envir
 ## Archive format
 
 Archives use **ZIP** (`ZipArchive`) only. RAR is not supported.
+
+---
+
+## Maintainers: rebuild the Backups page CSS
+
+If you change `resources/views/pages/manage-backups.blade.php`, regenerate the committed bundle:
+
+```bash
+cd vendor/nehalfstudio/filament-backup   # or your path repo clone
+npm install
+npm run build:css
+php artisan filament:assets              # from the host Laravel app
+```
+
+Source: `resources/build/manage-backups.tw.css` (Tailwind v4 CLI).
 
 ---
 

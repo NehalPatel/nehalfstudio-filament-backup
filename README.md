@@ -67,7 +67,66 @@ That publishes (among other files) `public/css/nehalfstudio-filament-backup/mana
 
 Re-run `php artisan filament:assets` whenever you upgrade Filament or this package.
 
-### 5. Database notifications (recommended)
+### 5. Filament panel theme — fixing missing `/build/assets/theme-*.css` (whole admin unstyled)
+
+The hashed file **`theme-CC_zA7Ey.css`** (name changes each build) is **your Laravel app’s Filament panel theme**, built by **Vite**. It is **not** part of `nehalfstudio/filament-backup`. If the browser gets **404** on `/build/assets/theme-….css`, the panel (not only Backups) will look broken until the host app builds front-end assets.
+
+Do this in **every** application where Filament should look correct:
+
+1. **Create the panel theme file** (if you do not already have it), e.g. `resources/css/filament/admin/theme.css`. You can start from Filament’s install docs, or publish our minimal stub (adjust paths if your panel id is not `admin`):
+
+   ```bash
+   php artisan vendor:publish --tag=filament-backup-panel-theme
+   ```
+
+   That writes `resources/css/filament/admin/theme.css` with the correct `@import` of Filament’s base theme and `@source` entries for your app’s Filament PHP/Blade. If your panel uses another folder (e.g. `resources/css/filament/app/theme.css`), copy the file and fix the `../` segments in `@import` / `@source` so they still resolve to project `vendor/` and `app/Filament`.
+
+2. **Register the same path** on the panel in `app/Providers/Filament/*PanelProvider.php`:
+
+   ```php
+   ->viteTheme('resources/css/filament/admin/theme.css')
+   ```
+
+   The string must **exactly match** one of the Vite `input` paths below.
+
+3. **Add Tailwind + Vite entries** in `vite.config.js` (Filament v5 expects Tailwind v4; `@tailwindcss/vite` is required for the theme CSS):
+
+   ```js
+   import { defineConfig } from 'vite';
+   import laravel from 'laravel-vite-plugin';
+   import tailwindcss from '@tailwindcss/vite';
+
+   export default defineConfig({
+       plugins: [
+           laravel({
+               input: [
+                   'resources/css/app.css',
+                   'resources/css/filament/admin/theme.css',
+                   'resources/js/app.js',
+               ],
+               refresh: true,
+           }),
+           tailwindcss(),
+       ],
+   });
+   ```
+
+4. **Install JS dependencies and build** from the **Laravel project root**:
+
+   ```bash
+   npm install
+   npm run build
+   ```
+
+   For local development you can use `npm run dev` and keep the dev server running so Vite serves the theme.
+
+5. **Confirm output:** after `npm run build`, `public/build/manifest.json` must list an entry for `resources/css/filament/admin/theme.css` and `public/build/assets/theme-*.css` must exist. The hash in the filename will **differ** from other projects — that is normal.
+
+6. **Production:** deploy the `public/build` directory (or run `npm ci && npm run build` on the server). If you use `config:cache`, run `php artisan config:clear` while debugging asset URLs.
+
+**Summary:** `nehalfstudio/filament-backup` only adds `manage-backups-page.css` via `php artisan filament:assets`. **`theme-*.css` is always your app’s responsibility** (Vite + `viteTheme` + `npm run build`).
+
+### 6. Database notifications (recommended)
 
 Success and failure messages can be stored as Filament database notifications. Your `User` model should use `Notifiable`, and you need the notifications table:
 
@@ -78,11 +137,11 @@ php artisan migrate
 
 If notifications are missing, the package still shows **toast** notifications in the panel; database delivery is skipped with a log warning.
 
-### 6. Environment variables
+### 7. Environment variables
 
 Copy the variables you need into `.env` (full list in [Configuration](#configuration-environment-variables)). At minimum, set a **local backup path** if you do not want the default `storage/app/backups`. For **Google Drive** with a personal Gmail account, use **OAuth** (see [Google Drive setup](#google-drive-setup-recommended-oauth)); do not rely on a service account for personal “My Drive.”
 
-### 7. Clear config cache
+### 8. Clear config cache
 
 After changing `.env` or config:
 

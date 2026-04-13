@@ -54,6 +54,10 @@ class FilamentBackupServiceProvider extends ServiceProvider
             dirname(__DIR__).'/lang' => lang_path('vendor/filament-backup'),
         ], 'filament-backup-translations');
 
+        $this->publishes([
+            dirname(__DIR__).'/resources/stubs/filament-panel-theme.css' => resource_path('css/filament/admin/theme.css'),
+        ], 'filament-backup-panel-theme');
+
         if ($this->app->runningInConsole()) {
             $this->commands([
                 RunBackupCommand::class,
